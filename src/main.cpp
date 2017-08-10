@@ -96,12 +96,21 @@ int main() {
                     double steering_angle = j[1]["steering_angle"];
                     double throttle = j[1]["throttle"];
 
-                    for (int i = 0; i < ptsx.size(); ++i) {
-                        double shift_x = ptsx[i]-px;
-                        double shift_y = ptsy[i]-py;
+                    // Try to get an idea of where the car will be in the future.
+                    double latency = 0.1;
+                    double Lf = 2.67;
+                    px += v * cos(psi) * latency;
+                    py += v * sin(psi) * latency;
+                    psi += v * steering_angle / Lf * latency;
+                    v += throttle * latency;
+
+                    // Space Transformation
+                    for (int i = 0; i < ptsx.size(); i++) {
+                        double shift_x = ptsx[i] - px;
+                        double shift_y = ptsy[i] - py;
 
                         ptsx[i] = (shift_x * cos(0-psi) - shift_y * sin(0-psi));
-                        ptsy[i] = (shift_x * sin(0-psi) - shift_y * cos(0-psi));
+                        ptsy[i] = (shift_x * sin(0-psi) + shift_y * cos(0-psi));
                     }
 
                     double* ptrx = &ptsx[0];
@@ -119,18 +128,22 @@ int main() {
 
                     auto vars = mpc.Solve(state, coeffs);
 
-
                     json msgJson;
                     // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
                     // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-                    msgJson["steering_angle"] = vars[0]/(deg2rad(25) * 2.67);
-                    msgJson["throttle"] = vars[1];
+                    double steering_value = vars[0] / (deg2rad(25) * Lf);
+                    double throttle_value = vars[1];
+                    cout << "Steering: (" << vars[0] << "}      " << steering_value << "   Throttle: " << throttle_value << endl;
+                    msgJson["steering_angle"] = steering_value;
+                    msgJson["throttle"] = throttle_value;
 
                     //Display the MPC predicted trajectory
                     vector<double> mpc_x_vals;
                     vector<double> mpc_y_vals;
 
-                    for (int i = 2; i < vars.size(); ++i) {
+                    mpc_x_vals.push_back(px);
+                    mpc_y_vals.push_back(py);
+                    for (int i = 2; i < vars.size(); i++) {
                         if (i % 2 == 0) {
                             mpc_x_vals.push_back(vars[i]);
                         } else {
@@ -142,11 +155,12 @@ int main() {
                     msgJson["mpc_y"] = mpc_y_vals;
 
                     //Display the waypoints/reference line
+                    double poly_inc = 2.5;
+                    int num_points = 25;
+
                     vector<double> next_x_vals;
                     vector<double> next_y_vals;
 
-                    double poly_inc = 2.5;
-                    int num_points = 25;
                     for (int i = 1; i < num_points; i++) {
                         next_x_vals.push_back(poly_inc * i);
                         next_y_vals.push_back(polyeval(coeffs, poly_inc * i));
@@ -154,7 +168,6 @@ int main() {
 
                     msgJson["next_x"] = next_x_vals;
                     msgJson["next_y"] = next_y_vals;
-
 
                     auto msg = "42[\"steer\"," + msgJson.dump() + "]";
                     std::cout << msg << std::endl;
@@ -167,7 +180,7 @@ int main() {
                     //
                     // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
                     // SUBMITTING.
-//                    this_thread::sleep_for(chrono::milliseconds(100));
+                    this_thread::sleep_for(chrono::milliseconds(100));
                     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 }
             } else {
