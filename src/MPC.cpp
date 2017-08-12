@@ -7,8 +7,8 @@
 
 using CppAD::AD;
 
-size_t N = 10;
-double dt = 0.1;
+size_t N = 8;
+double dt = 0.2;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -111,10 +111,10 @@ public:
 
             fg[2 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
             fg[2 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-            fg[2 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
+            fg[2 + psi_start + t] = psi1 - (psi0 - v0 * delta0 / Lf * dt);
             fg[2 + v_start + t] = v1 - (v0 + a0 * dt);
             fg[2 + cte_start + t] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
-            fg[2 + epsi_start + t] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * dt);
+            fg[2 + epsi_start + t] = epsi1 - ((psi0 - psides0) - v0 * delta0 / Lf * dt);
         }
     }
 };
@@ -144,7 +144,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     // Initial value of the independent variables.
     // SHOULD BE 0 besides initial state.
     Dvector vars(n_vars);
-    for (int i = 0; i < n_vars; i++) {
+    for (i = 0; i < n_vars; i++) {
         vars[i] = 0;
     }
 
@@ -152,8 +152,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     Dvector vars_lowerbound(n_vars);
     Dvector vars_upperbound(n_vars);
 
-    // Set all non-actuators upper and lowerlimits
-    // to the max negative and positive values.
+    // Set all non-actuators upper and lower limits to the max negative and positive values.
     for (i = 0; i < delta_start; i++) {
         vars_lowerbound[i] = -1.0e19;
         vars_upperbound[i] = 1.0e19;
@@ -161,14 +160,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
     // The upper and lower limits of delta are set to -25 and 25
     // degrees (values in radians = 0.436332).
-    // NOTE: Feel free to change this to something else.
     for (i = delta_start; i < a_start; i++) {
-        vars_lowerbound[i] = -0.436332;
-        vars_upperbound[i] = 0.436332;
+        vars_lowerbound[i] = -0.436332 * Lf;
+        vars_upperbound[i] = 0.436332 * Lf;
     }
 
     // Acceleration/deceleration upper and lower limits.
-    // NOTE: Feel free to change this to something else.
     for (i = a_start; i < n_vars; i++) {
         vars_lowerbound[i] = -1.0;
         vars_upperbound[i] = 1.0;

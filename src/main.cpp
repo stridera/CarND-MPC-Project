@@ -133,7 +133,7 @@ int main() {
                     // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
                     double steering_value = vars[0] / (deg2rad(25) * Lf);
                     double throttle_value = vars[1];
-                    cout << "Steering: (" << vars[0] << "}      " << steering_value << "   Throttle: " << throttle_value << endl;
+//                    cout << "Steering: (" << vars[0] << "}      " << steering_value << "   Throttle: " << throttle_value << endl;
                     msgJson["steering_angle"] = steering_value;
                     msgJson["throttle"] = throttle_value;
 
@@ -141,8 +141,8 @@ int main() {
                     vector<double> mpc_x_vals;
                     vector<double> mpc_y_vals;
 
-                    mpc_x_vals.push_back(px);
-                    mpc_y_vals.push_back(py);
+//                    mpc_x_vals.push_back(px);
+//                    mpc_y_vals.push_back(py);
                     for (int i = 2; i < vars.size(); i++) {
                         if (i % 2 == 0) {
                             mpc_x_vals.push_back(vars[i]);
