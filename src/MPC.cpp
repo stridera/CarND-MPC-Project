@@ -22,7 +22,7 @@ double dt = 0.1;
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
 
-double ref_v = 80;
+double ref_v = 100;
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -62,9 +62,8 @@ public:
 
         // Lower weights on velocity.  We're ok slowing down for curves.
         for (int i = 0; i < N - 1; i++) {
-            fg[0] += 10 * CppAD::pow(vars[delta_start + i], 2);
+            fg[0] += 200 * CppAD::pow(vars[delta_start + i] * vars[v_start + i], 2);
             fg[0] += 10 * CppAD::pow(vars[a_start + i], 2);
-            fg[0] += 100 * CppAD::pow(vars[delta_start + i] * vars[v_start + i], 2);
         }
 
         // moderate to small weights to make steering smoother
