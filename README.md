@@ -1,9 +1,39 @@
 # CarND-Controls-MPC
 Self-Driving Car Engineer Nanodegree Program
 
+## Project Writeup
+
+### The Model
+
+The project has a vehicle that provides vehicle states and lets you modify two actuators.  The vehicle state we are given is the vehicles location (x and y) as well as the direction it's facing (psi).  Finally we're given the speed it's moving (v).  The actuators we have access to control the vehicle are the steering angle and the throttle (which includes going in reverse if required.)
+
+We take the simple model of stepping through each of them, and calculating all the points where the car would be in the future assuming the actuators don't change.  For example, our code looks like this (vars renamed for readability):
+
+```
+x+n = next_x - (current_x + current_v * cos(current_psi) * time_step);
+y+n = next_y - (current_y + current_v * sin(current_psi) * time_step);
+psi+n = next_psi - (current_psi - current_v * current_actuator_psi / size_of_car * time_step);
+v+n = next_v - (current_v + current_actuator_v * time_step);
+```
+
+You can see that I basically step through each timestep length and calculate where each point will be for each step up to the max.  This is run through a for loop that incrementally starts on the next waypoint.  So, the first time you get a line starting from x0.  Next time you bend the line from x1, then x2, and so on until you reach N.  This will give you the current route we plan to take that we solve against to find the best match to stay as close to the CTE as possible.
+
+### Timestep Length and Elapsed Duration (N & dt)
+N and dt are both variables that determine how far out we take our planned route.  dt is the time step we have between predicted path points, and N is the number of points we step out.  I selected 10 and 0.1 as my values.  I honestly selected 0.1 as my timestamp because it matched my latency and had a nice synergy.  I selected 10 steps in advance because it looked nice on in the simulator and appeared to work well.  (Not to mention them being pretty close to the recommended values given in the class.)  Having too high of a value would be useless since we would be mapping too far in advance and the future we guess would almost certainly change.  Making the values too small would in turn give us too narrow of a view of the future and make it so we can't plan actions for curves quick enough to have the car react.
+
+### Polynomial Fitting and MPC Preprocessing
+
+To handle the waypoints seen by the sensors, we first  had to take the current points found and convert them into vehicle coordinates.  We were then able to take these transformed points and run them through the polyfit, polyeval, and simple trig functions to get the current state that we were able to pass to the mpc solver.
+
+### Model Predictive Control with Latency
+
+To account for latency, I simply took where the vehicle currently was and added 0.1 sec.  While this is kinda cheating (since we know for a fact that our simulator is delayed by that amount), it let me supply points of where the vehicle would be given the current conditions.  This meant that any solutions provided were actually for a tenth of a second ahead of where the car actually was, and thus, would react exactly as expected once the latency was overcome.
+
+We also add values to the cost function to make the system more likely to handle some actions than others to make the system smoother.  These values required some tuning, but once a good set of numbers were found, the car drove wonderfully.  When these numbers were too small, for example, the car would constantly overcorrect and would whip left and right until it was flung off the road.  If they were too large, it wouldn't respond fast enough and would just drive off the road on any curve.  I also used ref_v (preferred speed) to help adjust these, and attempted to get to a speed of 200, but things would always get a little iffy above 100.  Still, I think running the track at 100mph is a great result.
+
 ---
 
-## Dependencies
+## Installation Dependencies
 
 * cmake >= 3.5
  * All OSes: [click here for installation instructions](https://cmake.org/install/)
@@ -44,72 +74,7 @@ Self-Driving Car Engineer Nanodegree Program
 
 ## Basic Build Instructions
 
-
 1. Clone this repo.
 2. Make a build directory: `mkdir build && cd build`
 3. Compile: `cmake .. && make`
 4. Run it: `./mpc`.
-
-## Tips
-
-1. It's recommended to test the MPC on basic examples to see if your implementation behaves as desired. One possible example
-is the vehicle starting offset of a straight line (reference). If the MPC implementation is correct, after some number of timesteps
-(not too many) it should find and track the reference line.
-2. The `lake_track_waypoints.csv` file has the waypoints of the lake track. You could use this to fit polynomials and points and see of how well your model tracks curve. NOTE: This file might be not completely in sync with the simulator so your solution should NOT depend on it.
-3. For visualization this C++ [matplotlib wrapper](https://github.com/lava/matplotlib-cpp) could be helpful.
-
-## Editor Settings
-
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
-## Code Style
-
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
-
-## Project Instructions and Rubric
-
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
-
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/b1ff3be0-c904-438e-aad3-2b5379f0e0c3/concepts/1a2255a0-e23c-44cf-8d41-39b8a3c8264a)
-for instructions and the project rubric.
-
-## Hints!
-
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
-
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
